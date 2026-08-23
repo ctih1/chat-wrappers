@@ -3,46 +3,46 @@ import telnetlib3
 import time
 import requests
 
-async def shell(reader: telnetlib3.TelnetReaderUnicode, writer: telnetlib3.TelnetWriterUnicode):
+
+async def shell(
+    reader: telnetlib3.TelnetReaderUnicode, writer: telnetlib3.TelnetWriterUnicode
+):
+    ip = writer.get_extra_info("peername")[0]
+    print(f"New connection from {ip}")
+
     writer.write("\r\nHello and thank you for connecting to my Telnet server!\r\n")
     writer.write("Type a message to send out (max 255 characters)\r\n")
     writer.write(">> ")
-    ip = writer.get_extra_info("peername")[0]
 
-    print(f"New connection from {ip}")
+    try:
+        text = (await reader.readline()).strip()
+    except Exception as e:
+        print(e)
+        return
 
-    text = ""
+    print(f"Receveid text {text}")
 
-    while True:
-        data = await reader.read(1)
-        print(data.encode("utf-8"))
-        if data in ["\x08", "\x7f"]:
-            text = text[:-1]
-        if data == "\x03":
-            writer.close()
-            break
-        if data in ["\n", "\r"]:
-            break
-        if data == "":
-            break
-        else:
-            text += data
-
-        writer.echo(data)
-
-    await writer.drain()
-
-    writer.write(f"\r\nYou typed: \"{text}\"")
+    writer.write(f'\r\nYou typed: "{text}"')
     writer.write("\r\n\r\nCorrect? (y/n + enter): ")
 
     response = (await reader.readline()).strip()
-    writer.echo(response)
+
+    print(f"Received repsonse {response}")
 
     if response == "y":
         writer.write("\r\nContacting da sophisticated API...")
-        await writer.drain()
 
-        res = requests.post("http://192.168.32.88:3001/api/chat", json={"source": "telnet", "ip": ip, "text": text})
+        try:
+            res = await asyncio.to_thread(
+                requests.post,
+                "http://192.168.32.88:3001/api/chat",
+                json={"source": "telnet", "ip": ip, "text": text},
+                timeout=8,
+            )
+        except Exception as e:
+            writer.write("\r\nFailed to send message, request failed. Oops!")
+            writer.close()
+            return
 
         message = ""
 
@@ -63,9 +63,16 @@ async def shell(reader: telnetlib3.TelnetReaderUnicode, writer: telnetlib3.Telne
 
 
 async def main():
-    server = await telnetlib3.create_server(port=6023, host="0.0.0.0", shell=shell) # type: ignore
-    print("Started server")
-    await server.wait_closed()
+    server = await telnetlib3.create_server(port=6023, host="0.0.0.0", shell=shell)  # type: ignore
+    server2 = await telnetlib3.create_server(
+        port=6024, host="0.0.0.0", shell=shell, line_mode=True  # type: ignore ,line_mode=True suggested by chatgpt since I couldn't find a way to enable local echo as it wasnt documented I think
+    )
+    loop = asyncio.get_event_loop()
+    asyncio.create_task(server.wait_for_client())
+    asyncio.create_task(server2.wait_for_client())
+    print("Started both servers")
+    while True:
+        await asyncio.sleep(1)
 
 
 asyncio.run(main())
