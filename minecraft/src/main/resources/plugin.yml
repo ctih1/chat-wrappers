@@ -1,0 +1,4 @@
+name: Chat
+version: '1.0-SNAPSHOT'
+main: fi.ctih1.chat.Chat
+api-version: '1.18'
