@@ -58,37 +58,40 @@ def metrics():
 async def sms_loop():
     global network_data, signal_data
     while True:
-        print("Checking SMS...")
-        sms = await zte.get_sms()
+        try:
+            print("Checking SMS...")
+            sms = await zte.get_sms()
 
-        network_data = await zte.get_network_details()
-        signal_data = await zte.get_signal_strength()
+            network_data = await zte.get_network_details()
+            signal_data = await zte.get_signal_strength()
 
-        for number, messages in sms.items():
-            for message in messages:
-                if message.id in ids:
-                    continue
+            for number, messages in sms.items():
+                for message in messages:
+                    if message.id in ids:
+                        continue
 
-                if not message.content.startswith("!"):
-                    continue
+                    if not message.content.startswith("!"):
+                        continue
 
-                print("Found new message")
-                r = requests.post(
-                    "http://192.168.32.88:3001/api/chat",
-                    json={
-                        "source": "sms",
-                        "ip": zte_sha256_string(number),
-                        "text": message.content[1:],
-                    },
-                )
+                    print("Found new message")
+                    r = requests.post(
+                        "http://192.168.32.88:3001/api/chat",
+                        json={
+                            "source": "sms",
+                            "ip": zte_sha256_string(number),
+                            "text": message.content[1:],
+                        },
+                    )
 
-                if r.status_code == 200:
-                    ids.append(message.id)
+                    if r.status_code == 200:
+                        ids.append(message.id)
 
-                    with open("ids.json", "w") as f:
-                        json.dump(ids, f)
-                else:
-                    print(r.status_code, r.json()["message"])
+                        with open("ids.json", "w") as f:
+                            json.dump(ids, f)
+                    else:
+                        print(r.status_code, r.json()["message"])
+        except Exception as e:
+            print(e)
 
         await asyncio.sleep(5)
 
