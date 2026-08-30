@@ -1,0 +1,3 @@
+[submodule "sms/zte"]
+	path = sms/zte
+	url = https://github.com/ctih1/zte-wrapper
